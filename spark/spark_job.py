@@ -13,7 +13,7 @@ warnings.filterwarnings('ignore', message='urllib3 v2 only supports OpenSSL 1.1.
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf, col, from_json
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
-import json, requests, hashlib, time
+import json, requests, hashlib, time, re
 import redis
 import numpy as np
 
@@ -67,6 +67,67 @@ def setup_redis_index():
             print(f" Failed to create Redis index: {e}")
 
 setup_redis_index()
+
+def normalize_log_message(message):
+    """
+    Strip dynamic elements from log messages to create a normalized template.
+    This allows us to detect duplicate log patterns even with different IPs, ports, etc.
+    
+    Replaces:
+    - IP addresses (IPv4) with <IP>
+    - Ports with <PORT>
+    - Block IDs with <BLOCK_ID>
+    - File sizes with <SIZE>
+    - Timestamps with <TIMESTAMP>
+    - File paths with <PATH>
+    """
+    if not message:
+        return message
+    
+    normalized = message
+    
+    # Replace IP addresses (IPv4 format: xxx.xxx.xxx.xxx)
+    normalized = re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', '<IP>', normalized)
+    
+    # Replace ports (numbers after colons in network addresses)
+    normalized = re.sub(r':<PORT>:\d+', ':<PORT>', normalized)  # Handle already replaced IPs
+    normalized = re.sub(r':(\d{4,5})\b', ':<PORT>', normalized)
+    
+    # Replace block IDs (blk_-1234567890123456789 format)
+    normalized = re.sub(r'blk_-?\d+', '<BLOCK_ID>', normalized)
+    
+    # Replace file sizes (numbers followed by size indicators or standalone large numbers)
+    normalized = re.sub(r'\bsize\s+\d+', 'size <SIZE>', normalized)
+    normalized = re.sub(r'\bof\s+size\s+\d+', 'of size <SIZE>', normalized)
+    
+    # Replace timestamps at the beginning (YYMMDD HHMMSS format)
+    normalized = re.sub(r'^\d{6}\s+\d{6}', '<TIMESTAMP>', normalized)
+    
+    # Replace file paths (starting with / and containing slashes)
+    normalized = re.sub(r'/[\w/\.\-]+\.(jar|split|xml|txt)', '<PATH>', normalized)
+    normalized = re.sub(r'/mnt/[\w/\.\-]+', '<PATH>', normalized)
+    
+    # Replace job IDs
+    normalized = re.sub(r'job_\d+_\d+', '<JOB_ID>', normalized)
+    
+    return normalized
+
+def check_log_exists_in_redis(normalized_message):
+    """
+    Check if a normalized log message already exists in Redis.
+    Returns True if exists, False otherwise.
+    """
+    try:
+        # Create a hash of the normalized message to use as a lookup key
+        message_hash = hashlib.md5(normalized_message.encode()).hexdigest()
+        lookup_key = f"normalized:{message_hash}"
+        
+        # Check if this normalized message exists
+        exists = redis_client.exists(lookup_key)
+        return bool(exists)
+    except Exception as e:
+        print(f"    Error checking Redis for existing log: {e}")
+        return False
 
 # Initialize Spark Session
 print("🚀 Initializing Spark Session...")
@@ -141,11 +202,26 @@ def foreach_batch_hdfs(df, epoch_id):
     print(f"   Batch size: {len(rows)} messages")
     
     # Extract messages and metadata - Production mode: no labels needed
+    # Also normalize messages and filter out duplicates
     messages = []
+    normalized_messages = []
     metadata = []
+    original_messages = []
+    
+    skipped_count = 0
     
     for row in rows:
-        messages.append(row['message'])
+        original_msg = row['message']
+        normalized_msg = normalize_log_message(original_msg)
+        
+        # Check if this normalized message already exists in Redis
+        if check_log_exists_in_redis(normalized_msg):
+            skipped_count += 1
+            continue
+        
+        messages.append(original_msg)
+        normalized_messages.append(normalized_msg)
+        original_messages.append(original_msg)
         metadata.append({
             'timestamp': row['timestamp'],
             'original_text': row['original_text'],
@@ -153,6 +229,13 @@ def foreach_batch_hdfs(df, epoch_id):
             'source': row['source'],
             'node_type': row['node_type']
         })
+    
+    if skipped_count > 0:
+        print(f"   ⏭️  Skipped {skipped_count} duplicate log patterns already in Redis")
+    
+    if not messages:
+        print("   ℹ️  All logs in batch already exist in Redis, skipping embedding generation")
+        return
     
     # Generate embeddings
     try:
@@ -176,8 +259,9 @@ def foreach_batch_hdfs(df, epoch_id):
     
     # Prepare data for Redis VL - Production mode: just store embeddings
     redis_entries = []
+    normalized_keys = []
     
-    for i, (embedding, meta) in enumerate(zip(embs, metadata)):
+    for i, (embedding, meta, normalized_msg) in enumerate(zip(embs, metadata, normalized_messages)):
         # Create unique ID using hash of message + timestamp
         entry_id = hashlib.md5(f"{messages[i]}_{meta.get('timestamp', str(time.time()))}".encode()).hexdigest()
         redis_key = f"{REDIS_KEY_PREFIX}{entry_id}"
@@ -199,21 +283,29 @@ def foreach_batch_hdfs(df, epoch_id):
                 "log_level": safe_str(meta.get('log_level'), "INFO"),
                 "source": safe_str(meta.get('source'), "hdfs"),
                 "node_type": safe_str(meta.get('node_type'), "datanode"),
-                "label": 0  # Default to 0, scoring service will update if anomaly detected
+                "label": 0,  # Default to 0, scoring service will update if anomaly detected
+                "normalized_text": safe_str(normalized_msg)  # Store normalized version for reference
             }
         }
         redis_entries.append(redis_entry)
+        
+        # Track normalized message for deduplication
+        message_hash = hashlib.md5(normalized_msg.encode()).hexdigest()
+        normalized_keys.append(f"normalized:{message_hash}")
     
     # Insert into Redis using pipeline for better performance
     try:
         print(f"    Inserting {len(redis_entries)} entries to Redis VL...")
         
         pipe = redis_client.pipeline()
-        for entry in redis_entries:
+        for entry, norm_key in zip(redis_entries, normalized_keys):
+            # Store the actual log entry with embedding
             pipe.hset(entry["key"], mapping=entry["data"])
+            # Store normalized message marker for deduplication (expires in 30 days)
+            pipe.setex(norm_key, 2592000, entry["key"])
         pipe.execute()
         
-        print(f"    Batch {epoch_id} processed: {len(redis_entries)} log entries stored in Redis VL")
+        print(f"    Batch {epoch_id} processed: {len(redis_entries)} new log entries stored in Redis VL")
         
     except Exception as e:
         print(f"    Redis VL insertion failed: {e}")

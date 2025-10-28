@@ -61,7 +61,7 @@ Anomaly detection in system log streams is a challenging task due to the volume,
 | **ML Framework** | Scikit-learn | 1.3+ | Ensemble learning models |
 | **Embeddings** | Sentence-BERT | 384-dim | Text vectorization |
 | **API Framework** | FastAPI | Latest | RESTful scoring service |
-| **Caching** | Redis | 7.0 | Performance optimization |
+| **Caching** | Redis | latest | Performance optimization |
 | **Monitoring** | Grafana | Latest | System dashboards |
 | **Orchestration** | Docker Compose | Latest | Service management |
 
