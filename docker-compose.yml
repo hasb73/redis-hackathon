@@ -31,12 +31,31 @@ services:
     environment:
       - REDIS_ARGS=--save 60 1000 --appendonly yes
 
+  redis-ai:
+    image: redislabs/redisai:latest
+    ports:
+      - "6380:6379"  # Redis AI server
+    volumes:
+      - redis_ai_data:/data
+    environment:
+      - REDIS_ARGS=--save 60 1000 --appendonly yes
+
   embedding:
     build: ./embedding_service
     ports:
       - "8000:8000"
     depends_on:
       - redis-stack
+
+  log-analysis-chat:
+    build: ./log-analysis-chat
+    ports:
+      - "8004:8004"  # Chat interface
+    depends_on:
+      - redis-stack
+      - redis-ai
+    volumes:
+      - ./anomaly-detection-service:/app/anomaly-detection-service:ro
 
   grafana:
     image: grafana/grafana:latest
@@ -102,6 +121,7 @@ services:
 
 volumes:
   redis_data:
+  redis_ai_data:
   grafana-data:
     driver: local
   grafana-logs:
