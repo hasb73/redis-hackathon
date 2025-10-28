@@ -223,8 +223,8 @@ docker-compose up --build -d
 
 # Service endpoints
 # - Kafka: localhost:9092
-# - redis: localhost:6333
-# - Redis: localhost:6379
+# - Redis-stack: localhost:6379 / insights GUI - localhost:8001
+# - Embedding service: localhost:8000
 # - Grafana: http://localhost:3000 (admin/password)
 ```
 
