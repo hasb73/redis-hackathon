@@ -1,0 +1,76 @@
+{
+  "timestamp": "2025-09-27T18:39:14.857864",
+  "database_path": "anomaly_detection.db",
+  "connection_successful": true,
+  "total_queries_tested": 8,
+  "successful_queries": 8,
+  "queries_within_threshold": 8,
+  "success_rate": 1.0,
+  "performance_rate": 1.0,
+  "test_results": [
+    {
+      "description": "Real-time system metrics (last hour)",
+      "query": "\n                    SELECT \n                        COUNT(*) as total_predictions,\n                        AVG(CASE WHEN is_correct = 1 THEN 1.0 ELSE 0.0 END) as accuracy,\n                        AVG(anomaly_score) as avg_anomaly_score,\n                        AVG(confidence) as avg_confidence,\n                        AVG(processing_time_ms) as avg_processing_time\n                    FROM anomaly_detections \n                    WHERE datetime(created_at) >= datetime('now', '-1 hour')\n                ",
+      "execution_time": 2.5033950805664062e-05,
+      "row_count": 1,
+      "success": true,
+      "within_threshold": true
+    },
+    {
+      "description": "Current anomaly rate calculation",
+      "query": "\n                    SELECT \n                        COUNT(*) as total,\n                        SUM(CASE WHEN predicted_label = 1 THEN 1 ELSE 0 END) as anomalies,\n                        (SUM(CASE WHEN predicted_label = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as anomaly_rate\n                    FROM anomaly_detections \n                    WHERE datetime(created_at) >= datetime('now', '-1 hour')\n                ",
+      "execution_time": 1.71661376953125e-05,
+      "row_count": 1,
+      "success": true,
+      "within_threshold": true
+    },
+    {
+      "description": "Performance trends (30 days)",
+      "query": "\n                    SELECT \n                        DATE(created_at) as date,\n                        AVG(CASE WHEN is_correct = 1 THEN 1.0 ELSE 0.0 END) as daily_accuracy,\n                        COUNT(*) as daily_predictions,\n                        AVG(processing_time_ms) as avg_processing_time\n                    FROM anomaly_detections \n                    WHERE created_at >= datetime('now', '-30 days')\n                    GROUP BY DATE(created_at)\n                    ORDER BY date\n                ",
+      "execution_time": 2.7179718017578125e-05,
+      "row_count": 1,
+      "success": true,
+      "within_threshold": true
+    },
+    {
+      "description": "Confusion matrix data",
+      "query": "\n                    SELECT \n                        predicted_label,\n                        actual_label,\n                        COUNT(*) as count\n                    FROM anomaly_detections \n                    WHERE actual_label IS NOT NULL\n                    GROUP BY predicted_label, actual_label\n                ",
+      "execution_time": 0.000179290771484375,
+      "row_count": 0,
+      "success": true,
+      "within_threshold": true
+    },
+    {
+      "description": "Model voting patterns analysis",
+      "query": "\n                    SELECT \n                        model_votes,\n                        predicted_label,\n                        COUNT(*) as vote_count,\n                        AVG(confidence) as avg_confidence\n                    FROM anomaly_detections \n                    GROUP BY model_votes, predicted_label\n                    ORDER BY vote_count DESC\n                    LIMIT 20\n                ",
+      "execution_time": 5.602836608886719e-05,
+      "row_count": 3,
+      "success": true,
+      "within_threshold": true
+    },
+    {
+      "description": "Source-based performance analysis",
+      "query": "\n                    SELECT \n                        source,\n                        COUNT(*) as total_predictions,\n                        SUM(CASE WHEN predicted_label = 1 THEN 1 ELSE 0 END) as anomaly_count,\n                        AVG(CASE WHEN is_correct = 1 THEN 1.0 ELSE 0.0 END) as accuracy,\n                        AVG(processing_time_ms) as avg_processing_time\n                    FROM anomaly_detections \n                    GROUP BY source\n                    ORDER BY total_predictions DESC\n                ",
+      "execution_time": 2.9087066650390625e-05,
+      "row_count": 1,
+      "success": true,
+      "within_threshold": true
+    },
+    {
+      "description": "Latest performance metrics",
+      "query": "\n                    SELECT \n                        timestamp,\n                        accuracy,\n                        precision,\n                        recall,\n                        f1_score,\n                        total_predictions,\n                        avg_processing_time_ms\n                    FROM performance_metrics \n                    ORDER BY created_at DESC \n                    LIMIT 10\n                ",
+      "execution_time": 2.7894973754882812e-05,
+      "row_count": 3,
+      "success": true,
+      "within_threshold": true
+    },
+    {
+      "description": "Recent anomaly events timeline",
+      "query": "\n                    SELECT \n                        datetime(timestamp) as event_time,\n                        predicted_label,\n                        anomaly_score,\n                        confidence,\n                        source\n                    FROM anomaly_detections \n                    WHERE predicted_label = 1\n                    ORDER BY timestamp DESC \n                    LIMIT 100\n                ",
+      "execution_time": 3.6716461181640625e-05,
+      "row_count": 12,
+      "success": true,
+      "within_threshold": true
+    }
+  ]
+}

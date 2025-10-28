@@ -1,0 +1,24 @@
+apiVersion: 1
+
+datasources:
+  - name: AnomalyDetectionDB
+    type: frser-sqlite-datasource
+    access: proxy
+    url: file:///var/lib/grafana/data/anomaly_detection.db
+    isDefault: true
+    editable: true
+    jsonData:
+      path: /var/lib/grafana/data/anomaly_detection.db
+      # Connection validation settings
+      maxOpenConns: 10
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      # Query timeout in seconds
+      queryTimeout: 30
+      # Enable connection validation
+      validateConnection: true
+    secureJsonData: {}
+    version: 1
+    # Health check configuration
+    uid: P7BEE95809231D024
+    orgId: 1

@@ -1,0 +1,21 @@
+python3 hdfs_production_log_processor.py /var/log/hadoop-hdfs/hadoop-hdfs-datanode-ip-172-31-39-152.eu-west-1.compute.internal.log
+
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.0 spark_to_qdrant.py
+
+sh restart_anomaly_detection_service.sh  && tail -f anomaly_detection_engine.log
+
+
+——
+
+
+curl localhost:8003/health | python3 -m json.tool
+
+curl localhost:8003/anomalies | python3 -m json.tool
+
+curl localhost:8003/stats | python3 -m json.tool
+
+curl localhost:8003/cache/stats  | python3 -m json.tool
+
+curl localhost:8003/model_info  | python3 -m json.tool
+
+

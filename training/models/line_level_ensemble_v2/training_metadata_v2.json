@@ -1,0 +1,77 @@
+{
+  "sample_size": 10000,
+  "feature_dim": 384,
+  "anomaly_ratio": 0.0021,
+  "training_samples": 7000,
+  "validation_samples": 3000,
+  "model_types": [
+    "Decision Tree",
+    "MLP",
+    "SGD",
+    "Redis VL Similarity"
+  ],
+  "model_scores": {
+    "dt": {
+      "precision": 0.05128205128205128,
+      "recall": 0.6666666666666666,
+      "f1": 0.09523809523809523
+    },
+    "mlp": {
+      "precision": 1.0,
+      "recall": 0.3333333333333333,
+      "f1": 0.5
+    },
+    "sgd": {
+      "precision": 0.058823529411764705,
+      "recall": 0.8333333333333334,
+      "f1": 0.10989010989010989
+    },
+    "redis_similarity": {
+      "precision": 0.0030450669914738123,
+      "recall": 0.8333333333333334,
+      "f1": 0.006067961165048544
+    }
+  },
+  "best_hyperparameters": {
+    "dt": {
+      "criterion": "gini",
+      "max_depth": null,
+      "min_samples_leaf": 1,
+      "min_samples_split": 4
+    },
+    "mlp": {
+      "activation": "tanh",
+      "alpha": 0.0001,
+      "hidden_layer_sizes": [
+        150
+      ],
+      "max_iter": 300
+    },
+    "sgd": {
+      "loss": "hinge",
+      "penalty": "l2",
+      "alpha": 0.0001,
+      "learning_rate": "optimal",
+      "max_iter": 5000,
+      "early_stopping": true,
+      "validation_fraction": 0.1,
+      "n_iter_no_change": 10,
+      "tol": 0.0001
+    },
+    "redis_similarity": {
+      "threshold": 0.9
+    }
+  },
+  "model_weights": {
+    "dt": 0.12347354138398917,
+    "mlp": 0.6173677069199458,
+    "sgd": 0.135685210312076,
+    "redis_similarity": 0.12347354138398917
+  },
+  "redis_config": {
+    "index_name": "training_embeddings",
+    "threshold": 0.9,
+    "host": "localhost",
+    "port": 6379
+  }
+}

@@ -1,0 +1,404 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 4,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "P7BEE95809231D024"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "orientation": "auto",
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite-anomaly-db"
+          },
+          "queryText": "SELECT model_name, anomaly_vote_percentage as value FROM (SELECT 'Decision Tree' as model_name, SUM(JSON_EXTRACT(model_votes, '$.dt')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.dt')) as normal_votes, ROUND((SUM(JSON_EXTRACT(model_votes, '$.dt')) * 100.0 / COUNT(*)), 2) as anomaly_vote_percentage FROM anomaly_detections UNION ALL SELECT 'MLP Neural Network' as model_name, SUM(JSON_EXTRACT(model_votes, '$.mlp')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.mlp')) as normal_votes, ROUND((SUM(JSON_EXTRACT(model_votes, '$.mlp')) * 100.0 / COUNT(*)), 2) as anomaly_vote_percentage FROM anomaly_detections UNION ALL SELECT 'SGD Classifier' as model_name, SUM(JSON_EXTRACT(model_votes, '$.sgd')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.sgd')) as normal_votes, ROUND((SUM(JSON_EXTRACT(model_votes, '$.sgd')) * 100.0 / COUNT(*)), 2) as anomaly_vote_percentage FROM anomaly_detections UNION ALL SELECT 'Qdrant Similarity' as model_name, SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) as normal_votes, ROUND((SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) * 100.0 / COUNT(*)), 2) as anomaly_vote_percentage FROM anomaly_detections);",
+          "queryType": "table",
+          "rawQueryText": "SELECT model_name, anomaly_vote_percentage as value FROM (SELECT 'Decision Tree' as model_name, SUM(JSON_EXTRACT(model_votes, '$.dt')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.dt')) as normal_votes, ROUND((SUM(JSON_EXTRACT(model_votes, '$.dt')) * 100.0 / COUNT(*)), 2) as anomaly_vote_percentage FROM anomaly_detections UNION ALL SELECT 'MLP Neural Network' as model_name, SUM(JSON_EXTRACT(model_votes, '$.mlp')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.mlp')) as normal_votes, ROUND((SUM(JSON_EXTRACT(model_votes, '$.mlp')) * 100.0 / COUNT(*)), 2) as anomaly_vote_percentage FROM anomaly_detections UNION ALL SELECT 'SGD Classifier' as model_name, SUM(JSON_EXTRACT(model_votes, '$.sgd')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.sgd')) as normal_votes, ROUND((SUM(JSON_EXTRACT(model_votes, '$.sgd')) * 100.0 / COUNT(*)), 2) as anomaly_vote_percentage FROM anomaly_detections UNION ALL SELECT 'Qdrant Similarity' as model_name, SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) as normal_votes, ROUND((SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) * 100.0 / COUNT(*)), 2) as anomaly_vote_percentage FROM anomaly_detections);",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Models classifying % of log sequences as Anomalies",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "P7BEE95809231D024"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "showHeader": true,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite-anomaly-db"
+          },
+          "queryText": "SELECT model_name, anomaly_votes, normal_votes FROM (SELECT 'Decision Tree' as model_name, SUM(JSON_EXTRACT(model_votes, '$.dt')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.dt')) as normal_votes FROM anomaly_detections UNION ALL SELECT 'MLP Neural Network' as model_name, SUM(JSON_EXTRACT(model_votes, '$.mlp')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.mlp')) as normal_votes FROM anomaly_detections UNION ALL SELECT 'SGD Classifier' as model_name, SUM(JSON_EXTRACT(model_votes, '$.sgd')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.sgd')) as normal_votes FROM anomaly_detections UNION ALL SELECT 'Qdrant Similarity' as model_name, SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) as normal_votes FROM anomaly_detections);",
+          "queryType": "table",
+          "rawQueryText": "SELECT model_name, anomaly_votes, normal_votes FROM (SELECT 'Decision Tree' as model_name, SUM(JSON_EXTRACT(model_votes, '$.dt')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.dt')) as normal_votes FROM anomaly_detections UNION ALL SELECT 'MLP Neural Network' as model_name, SUM(JSON_EXTRACT(model_votes, '$.mlp')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.mlp')) as normal_votes FROM anomaly_detections UNION ALL SELECT 'SGD Classifier' as model_name, SUM(JSON_EXTRACT(model_votes, '$.sgd')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.sgd')) as normal_votes FROM anomaly_detections UNION ALL SELECT 'Qdrant Similarity' as model_name, SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) as anomaly_votes, COUNT(*) - SUM(JSON_EXTRACT(model_votes, '$.qdrant_similarity')) as normal_votes FROM anomaly_detections);",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Model Vote Counts",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "P7BEE95809231D024"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "showHeader": true,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite-anomaly-db"
+          },
+          "queryText": "SELECT strftime('%Y-%m-%d %H:00:00', created_at) as time_bucket, COUNT(*) as total_predictions, SUM(CASE WHEN predicted_label = 1 THEN 1 ELSE 0 END) as anomalies_detected, ROUND((SUM(CASE WHEN predicted_label = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as anomaly_rate_percent, AVG(processing_time_ms) as avg_processing_time, AVG(anomaly_score) as avg_anomaly_score FROM anomaly_detections WHERE created_at >= datetime('now', '-24 hours') GROUP BY strftime('%Y-%m-%d %H:00:00', created_at) ORDER BY time_bucket;",
+          "queryType": "table",
+          "rawQueryText": "SELECT strftime('%Y-%m-%d %H:00:00', created_at) as time_bucket, COUNT(*) as total_predictions, SUM(CASE WHEN predicted_label = 1 THEN 1 ELSE 0 END) as anomalies_detected, ROUND((SUM(CASE WHEN predicted_label = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as anomaly_rate_percent, AVG(processing_time_ms) as avg_processing_time, AVG(anomaly_score) as avg_anomaly_score FROM anomaly_detections WHERE created_at >= datetime('now', '-24 hours') GROUP BY strftime('%Y-%m-%d %H:00:00', created_at) ORDER BY time_bucket;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Hourly Performance Trends",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "P7BEE95809231D024"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "min",
+            "max",
+            "mean"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showHeader": true,
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite-anomaly-db"
+          },
+          "queryText": "SELECT source, AVG(processing_time_ms) as avg_processing_time FROM anomaly_detections GROUP BY source ORDER BY avg_processing_time DESC;",
+          "queryType": "table",
+          "rawQueryText": "SELECT source, AVG(processing_time_ms) as avg_processing_time FROM anomaly_detections GROUP BY source ORDER BY avg_processing_time DESC;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Processing Time by Source",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "30s",
+  "schemaVersion": 42,
+  "tags": [
+    "anomaly-detection",
+    "model-performance"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Model Performance Dashboard",
+  "uid": "model-performance-dashboard",
+  "version": 38
+}
