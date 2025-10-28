@@ -4,19 +4,14 @@
 
 ### Abstract
 
-Anomaly detection in system log streams is a challenging task due to the volume, throughput, variety, and lack of high-quality labelled data. This research proposes a novel ensemble-based anomaly detection system that addresses the challenges faced by traditional methods while also being usable in real-time scenarios, along with its ability to train on a small subset of the actual log data. 
+Anomaly detection in system log streams is a challenging task due to the volume, throughput, variety, and lack of high-quality labelled data. This research proposes a novel ensemble-based anomaly detection system that addresses the challenges faced by traditional methods while also being usable in real-time scenarios, along with its ability to train on a small subset of the actual log data.  We use Redis Vector Library (RedisVL) for as the embedding store and use Redis for caching the predictions of the ensemble mode;l
 
-The focus of this research is the block-level operations in Hadoop File System (HDFS) Logs. The core system is a weighted voting ensemble that combines predictions from diverse learning techniques, including Deep Learning (MLPClassifier), Classical Machine Learning (SGDClassifier, DecisionTreeClassifier), and a unique Vector Similarity Detector that uses a vector database for nearest-neighbor comparisons on embeddings
-
-To prove practicality, an anomaly detection service utilizes the trained model and consumes the live log stream in a real-time setup on AWS Elastic Map Reduce (EMR) to detect, cache, store the anomalies and alert a system administrator with visualisations and notications. The outcomes from testing, evaluation, and performance metrics, demonstrate the system’s end-to-end effectiveness while also displaying promising results in precision and accuracy, which are vital in this field
-
----
 
 ## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              HDFS Anomaly Detection Pipeline                             │
+│                       HDFS Anomaly Detection Pipeline with RedisVL                      │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -33,7 +28,7 @@ To prove practicality, an anomaly detection service utilizes the trained model a
                                                                              │
                                                                              ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Redis Cache   │◀───│ Anomaly Service │◀───│  Redis VDB     │◀───│  Vector Store   │
+│   Redis Cache   │◀───│ Anomaly Service │◀───│  Redis VDB      │◀───│  Vector Store   │
 │    (:6379)      │    │   (:8003)       │    │                 │    │  (RedisVL)      │
 └─────────────────┘    │   FastAPI       │    │ Cosine Search   │    └─────────────────┘
                        └─────────────────┘    └─────────────────┘
@@ -79,7 +74,7 @@ To prove practicality, an anomaly detection service utilizes the trained model a
 The codebase is organized into modular components for academic submission and production deployment:
 
 ```
-codebase-hdfs-anomaly-detection/
+redis-hackathon/
 ├── anomaly-detection-service/         # Core anomaly detection API service
 │   ├── anomaly_detection_service.py   # Main REST API service
 │   ├── anomaly_detection.db           # SQLite database for logging
@@ -88,8 +83,7 @@ codebase-hdfs-anomaly-detection/
 │   └── README.md                      # Service documentation
 │
 ├── training/                          # Model training and data preparation
-│   ├── train_line_level_ensemble_v1.py # Original ensemble training
-│   ├── train_line_level_ensemble_v2.py # Advanced ensemble training
+│   ├── train_ensemble_model.py # Advanced ensemble training
 │   ├── hdfs_line_level_loader_v2.py   # Data loading utilities
 │   ├── models/                        # Trained model artifacts
 │   │   ├── line_level_ensemble_v1/    # Version 1 models
@@ -246,7 +240,7 @@ pip3 install -r requirements.txt
 1. **Train Models**:
 ```bash
 # Run from project root
-python3 training/train_line_level_ensemble_v2.py
+python3 training/train_ensemble_model.py
 ```
 
 2. **Generate Evaluation Data with varying anomaly ratios**:
@@ -258,15 +252,22 @@ python3 evaluation/hdfs_anomaly_injection_loader.py
 3. **Start Anomaly Detection Service**:
 ```bash
 # Run from project root
-python3 anomaly-detection-service/anomaly_detection_service.py
+python3 anomaly-detection-service/anomaly_detection_service.py > anomaly-detection-service/anomaly-detection-service.log
 ```
 
-4. **Run Evaluation**:
+4. 
+
+```bash
+# Initialise spark job to store embeddings in RedisVL
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.0 spark_to_qdrant.py
+```
+
+5. **Run Evaluation Test with Anomaly injection**:
 ```bash
 # Run from project root (Example running the evaluation on 40% anomaly rate)
 python3 evaluation/anomaly_evaluation.py evaluation/anomaly-injection-tests/hdfs_eval_test_40.jsonl
-
 ```
+
 
 
 ---
@@ -303,7 +304,7 @@ python3 evaluation/anomaly_evaluation.py evaluation/anomaly-injection-tests/hdfs
 
 ### Machine Learning Pipeline
 - **Ensemble Learning**: Weighted voting with 4 diverse algorithms
-- **Vector Similarity**: redis-based nearest neighbor detection
+- **Vector Similarity**: redis-based nearest neighbor detection using HNSW index and cosine similarity
 - **Feature Engineering**: Sentence-BERT embeddings (384 dimensions)
 - **Real-time Processing**: Sub-second prediction latency
 
@@ -312,80 +313,15 @@ python3 evaluation/anomaly_evaluation.py evaluation/anomaly-injection-tests/hdfs
 - **Stream Processing**: Kafka + Spark for real-time data flow
 - **Caching**: Redis for performance optimization
 - **Monitoring**: Comprehensive dashboards and alerting
-
-### Development Features
-- **Modular Design**: Clean separation of concerns
-- **Documentation**: Comprehensive README files for each module
-- **Testing**: Automated stress testing and validation
-- **Deployment**: Docker Compose orchestration
-
 ---
 
-## Performance Metrics
-
-### Model Performance
-- **Accuracy**: >95% on HDFS dataset
-- **Precision**: >92% anomaly detection
-- **Recall**: >89% anomaly coverage
-- **F1-Score**: >90% balanced performance
-
-### System Performance
-- **Latency**: <60ms average prediction time
-- **Throughput**: >1000 predictions/second
-- **Scalability**: Horizontal scaling with Kafka partitions
-
----
-
-## Research Contributions
+## Contributions
 
 ### Novel Techniques
-1. **Hybrid Ensemble**: Combination of classical ML and vector similarity
+1. **Hybrid Ensemble**: Combination of classical ML and vector similarity using Redis VL
 2. **Real-time Architecture**: Production-ready streaming pipeline
 3. **Evaluation Framework**: Comprehensive testing methodology
 
 
-### Academic Value
-- **Reproducible Research**: Complete codebase with documentation
-- **Benchmarking**: Standardized evaluation metrics
+### Value
 - **Extensibility**: Modular architecture to deploy on any machine / cloud 
-
----
-
-## Usage Examples
-
-### API Usage
-```python
-import requests
-
-# Score a single log entry
-response = requests.post(
-    "http://localhost:8003/score",
-    params={"text": "HDFS log entry to analyze"}
-)
-result = response.json()
-print(f"Anomaly Score: {result['anomaly_score']}")
-```
-
-
-### Monitoring
-```bash
-# Access monitoring dashboards
-open http://localhost:3000
-# Username: admin, Password: *****
-```
-
----
-
----
-
-
-### Academic Use
-- Complete methodology documentation available
-- Reproducible experimental setup
-- Comprehensive evaluation metrics
-- Research-grade code organization
-
----
-
-
-This system represents a complete end-to-end solution for real-time HDFS log anomaly detection, suitable for both academic research and production deployment.
