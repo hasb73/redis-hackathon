@@ -62,6 +62,7 @@ class LogAnalysisChatBot:
         
         # Initialize RedisVL search index
         self.search_index = None
+        self.search_index_available = False
         self.init_redisvl()
         
         # Chat patterns and responses
@@ -76,8 +77,9 @@ class LogAnalysisChatBot:
             'trends': r'(?i)(trend|pattern|over time)',
             'errors': r'(?i)(error|failed|problem|issue)',
             'system_health': r'(?i)(health|status|system)',
-            'similar_logs': r'(?i)(similar|like|find.*similar|pattern)',
+            'similar_logs': r'(?i)(similar|like|find.*similar|pattern|search.*for)',
             'vector_search': r'(?i)(vector|semantic|embedding|similarity)',
+            'query_logs': r'(?i)(show.*logs?|find.*logs?|get.*logs?|logs?.*contain|logs?.*with)',
         }
         
         # Initialize AI models status
@@ -99,24 +101,25 @@ class LogAnalysisChatBot:
             try:
                 # Check if index exists using FT.INFO
                 redis_raw.execute_command('FT.INFO', self.redis_index_name)
+                logger.info(f"✅ RedisVL index '{self.redis_index_name}' exists with documents")
                 
-                # If no exception, index exists - create SearchIndex object
-                self.search_index = SearchIndex(
-                    name=self.redis_index_name,
-                    redis_client=redis_raw
-                )
-                logger.info(f"✅ Connected to existing RedisVL index: {self.redis_index_name}")
+                # Index exists - we'll use direct Redis commands instead of SearchIndex
+                # because SearchIndex requires schema definition
+                self.search_index = redis_raw
+                self.search_index_available = True
                 
             except redis.ResponseError as e:
                 if "Unknown index name" in str(e):
                     logger.warning(f"⚠️ RedisVL index '{self.redis_index_name}' does not exist yet")
                     self.search_index = None
+                    self.search_index_available = False
                 else:
                     raise e
             
         except Exception as e:
             logger.warning(f"⚠️ Could not connect to RedisVL index: {e}")
             self.search_index = None
+            self.search_index_available = False
     
     def check_redis_ai_models(self) -> bool:
         """Check if Redis AI models are loaded"""
@@ -160,7 +163,7 @@ class LogAnalysisChatBot:
             cursor = conn.cursor()
             
             # Check if table exists
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='log_entries'")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='anomaly_detections'")
             if not cursor.fetchone():
                 conn.close()
                 return {
@@ -171,18 +174,18 @@ class LogAnalysisChatBot:
                     'database_status': 'no_tables'
                 }
             
-            # Total anomalies
-            cursor.execute("SELECT COUNT(*) FROM log_entries WHERE is_anomaly = 1")
+            # Total anomalies (predicted_label = 1)
+            cursor.execute("SELECT COUNT(*) FROM anomaly_detections WHERE predicted_label = 1")
             total_anomalies = cursor.fetchone()[0]
             
             # Total logs
-            cursor.execute("SELECT COUNT(*) FROM log_entries")
+            cursor.execute("SELECT COUNT(*) FROM anomaly_detections")
             total_logs = cursor.fetchone()[0]
             
             # Recent anomalies (last hour)
             one_hour_ago = datetime.now() - timedelta(hours=1)
             cursor.execute(
-                "SELECT COUNT(*) FROM log_entries WHERE is_anomaly = 1 AND timestamp > ?",
+                "SELECT COUNT(*) FROM anomaly_detections WHERE predicted_label = 1 AND timestamp > ?",
                 (one_hour_ago.isoformat(),)
             )
             recent_anomalies = cursor.fetchone()[0]
@@ -218,9 +221,9 @@ class LogAnalysisChatBot:
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT timestamp, log_text, anomaly_score, prediction_confidence 
-                FROM log_entries 
-                WHERE is_anomaly = 1 
+                SELECT timestamp, text, anomaly_score, confidence 
+                FROM anomaly_detections 
+                WHERE predicted_label = 1 
                 ORDER BY timestamp DESC 
                 LIMIT ?
             """, (limit,))
@@ -258,10 +261,10 @@ class LogAnalysisChatBot:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            cursor.execute("SELECT AVG(processing_time_ms) FROM log_entries WHERE processing_time_ms > 0")
+            cursor.execute("SELECT AVG(processing_time_ms) FROM anomaly_detections WHERE processing_time_ms > 0")
             avg_time = cursor.fetchone()[0] or 0
             
-            cursor.execute("SELECT COUNT(*) FROM log_entries")
+            cursor.execute("SELECT COUNT(*) FROM anomaly_detections")
             total_predictions = cursor.fetchone()[0]
             
             conn.close()
@@ -281,52 +284,93 @@ class LogAnalysisChatBot:
         """Get embedding for text using the embedding service"""
         try:
             response = requests.post(
-                f"{self.embedding_service_url}/embeddings",
-                json={"text": text},
+                f"{self.embedding_service_url}/embed",
+                json={"texts": [text]},
                 timeout=10
             )
             if response.status_code == 200:
-                return response.json()["embedding"]
+                embeddings = response.json().get("embeddings", [])
+                return embeddings[0] if embeddings else None
         except Exception as e:
             logger.error(f"Error getting embedding: {e}")
         return None
     
     def vector_similarity_search(self, query_text: str, num_results: int = 5) -> List[Dict[str, Any]]:
-        """Perform vector similarity search using RedisVL"""
-        if not self.search_index or not REDISVL_AVAILABLE:
-            logger.warning("RedisVL search not available")
-            return []
-        
+        """Perform vector similarity search using direct Redis FT.SEARCH"""
         try:
+            logger.info(f"Vector search query: '{query_text}'")
+            
             # Get embedding for query text
             query_embedding = self.get_embedding(query_text)
             if not query_embedding:
+                logger.error("Could not get embedding for query")
                 return []
             
-            # Create vector query
-            query = VectorQuery(
-                vector=query_embedding,
-                vector_field_name="embedding",
-                return_fields=["log_text", "timestamp", "anomaly_score", "predicted_label"],
-                num_results=num_results
-            )
+            logger.info(f"Got embedding with {len(query_embedding)} dimensions")
             
-            # Execute search
-            results = self.search_index.query(query)
-            
-            # Format results
-            formatted_results = []
-            for result in results:
-                formatted_results.append({
-                    'log_text': result.get('log_text', ''),
-                    'timestamp': result.get('timestamp', ''),
-                    'anomaly_score': float(result.get('anomaly_score', 0)),
-                    'predicted_label': int(result.get('predicted_label', 0)),
-                    'similarity_score': float(result.get('vector_score', 0))
-                })
-            
-            logger.info(f"Vector search returned {len(formatted_results)} results")
-            return formatted_results
+            # Use direct Redis FT.SEARCH (most reliable method)
+            try:
+                redis_raw = redis.Redis(host='redis-stack', port=6379, decode_responses=False)
+                redis_raw.ping()
+                logger.info("Redis connection successful")
+                
+                # Convert embedding to bytes for Redis
+                embedding_bytes = np.array(query_embedding, dtype=np.float32).tobytes()
+                
+                # Perform KNN search using FT.SEARCH
+                search_result = redis_raw.execute_command(
+                    'FT.SEARCH', self.redis_index_name,
+                    f'*=>[KNN {num_results} @embedding $vec AS score]',
+                    'PARAMS', '2', 'vec', embedding_bytes,
+                    'SORTBY', 'score',
+                    'RETURN', '4', 'text', 'timestamp', 'label', 'score',
+                    'DIALECT', '2'
+                )
+                
+                # Parse results
+                formatted_results = []
+                if search_result and len(search_result) > 1:
+                    num_results_found = search_result[0]
+                    logger.info(f"Found {num_results_found} results from vector search")
+                    
+                    for i in range(1, len(search_result), 2):
+                        if i + 1 < len(search_result):
+                            doc_id = search_result[i].decode('utf-8') if isinstance(search_result[i], bytes) else search_result[i]
+                            fields = search_result[i + 1]
+                            
+                            # Parse fields
+                            field_dict = {}
+                            for j in range(0, len(fields), 2):
+                                if j + 1 < len(fields):
+                                    key = fields[j].decode('utf-8') if isinstance(fields[j], bytes) else fields[j]
+                                    value = fields[j + 1]
+                                    if isinstance(value, bytes):
+                                        try:
+                                            value = value.decode('utf-8')
+                                        except:
+                                            value = str(value)
+                                    field_dict[key] = value
+                            
+                            # Calculate similarity score (1 - distance for COSINE)
+                            distance = float(field_dict.get('score', 1.0))
+                            similarity = 1.0 - distance
+                            
+                            formatted_results.append({
+                                'log_text': field_dict.get('text', ''),
+                                'timestamp': field_dict.get('timestamp', ''),
+                                'anomaly_score': 0.0,
+                                'predicted_label': int(field_dict.get('label', 0)),
+                                'similarity_score': similarity
+                            })
+                
+                logger.info(f"Vector search returned {len(formatted_results)} results")
+                return formatted_results
+                
+            except Exception as e:
+                logger.error(f"Vector search failed: {e}")
+                import traceback
+                traceback.print_exc()
+                return []
             
         except Exception as e:
             logger.error(f"Vector similarity search failed: {e}")
@@ -340,9 +384,9 @@ class LogAnalysisChatBot:
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT log_text, anomaly_score 
-                FROM log_entries 
-                WHERE is_anomaly = 1 
+                SELECT text, anomaly_score 
+                FROM anomaly_detections 
+                WHERE predicted_label = 1 
                 ORDER BY timestamp DESC 
                 LIMIT 3
             """)
@@ -385,7 +429,7 @@ class LogAnalysisChatBot:
             return self.handle_help_query(message)
         elif intent == 'system_health':
             return self.handle_system_health_query(message)
-        elif intent == 'similar_logs':
+        elif intent == 'similar_logs' or intent == 'query_logs':
             return self.handle_similar_logs_query(message)
         elif intent == 'vector_search':
             return self.handle_vector_search_query(message)
@@ -686,7 +730,6 @@ class LogAnalysisChatBot:
     def handle_similar_logs_query(self, message: str) -> ChatResponse:
         """Handle queries for similar logs using vector search"""
         # Extract search term from message
-        search_terms = ["similar", "like", "pattern", "find"]
         search_text = message
         
         # Try to extract specific log text to search for
@@ -694,6 +737,13 @@ class LogAnalysisChatBot:
             parts = message.lower().split("like")
             if len(parts) > 1:
                 search_text = parts[1].strip().strip('"\'')
+        elif "similar to" in message.lower():
+            parts = message.lower().split("similar to")
+            if len(parts) > 1:
+                search_text = parts[1].strip().strip('"\'')
+        elif "find" in message.lower() and ("error" in message.lower() or "block" in message.lower() or "receiving" in message.lower()):
+            # Extract key terms for search
+            search_text = message
         
         # Perform vector similarity search
         similar_logs = self.vector_similarity_search(search_text, 5)
@@ -703,7 +753,8 @@ class LogAnalysisChatBot:
             response += "I couldn't find logs similar to your query. This could be because:\n"
             response += "• The embedding service is not available\n"
             response += "• No similar patterns exist in the log database\n"
-            response += "• The RedisVL index needs to be populated\n\n"
+            response += "• The Redis VL index needs to be populated with logs\n\n"
+            response += "💡 **Tip:** Make sure logs are being processed through the Spark job and stored in Redis.\n\n"
             response += "Try asking about recent anomalies or system status instead."
             
             suggestions = [
@@ -714,14 +765,16 @@ class LogAnalysisChatBot:
         else:
             response = f"🔍 **Found {len(similar_logs)} Similar Logs:**\n\n"
             
+            anomaly_count = sum(1 for log in similar_logs if log['predicted_label'] == 1)
+            response += f"📊 **Analysis:** {anomaly_count} anomalies, {len(similar_logs) - anomaly_count} normal logs\n\n"
+            
             for i, log in enumerate(similar_logs, 1):
                 is_anomaly = "🚨" if log['predicted_label'] == 1 else "✅"
                 response += f"**{i}.** {is_anomaly} `{log['timestamp']}`\n"
                 response += f"   📝 {log['log_text'][:100]}{'...' if len(log['log_text']) > 100 else ''}\n"
-                response += f"   🎯 Similarity: {log['similarity_score']:.3f} | Anomaly Score: {log['anomaly_score']:.3f}\n\n"
+                response += f"   🎯 Similarity: {log['similarity_score']:.3f}\n\n"
             
-            if REDISVL_AVAILABLE:
-                response += "✨ **Powered by RedisVL vector similarity search**"
+            response += "✨ **Powered by Redis Vector Search**"
             
             suggestions = [
                 "Find more patterns like these",
@@ -731,7 +784,7 @@ class LogAnalysisChatBot:
         
         return ChatResponse(
             response=response,
-            analysis_data={'similar_logs': similar_logs},
+            analysis_data={'similar_logs': similar_logs, 'query': search_text},
             suggestions=suggestions,
             timestamp=datetime.now().isoformat()
         )

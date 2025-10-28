@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "redis": {
+      "command": "/opt/homebrew/bin/uvx",
+      "args": ["mcp-server-redis"],
+      "env": {
+        "REDIS_HOST": "127.0.0.1",
+        "REDIS_PORT": "6379",
+        "REDIS_DB": "0",
+        "REDIS_PASSWORD": ""
+      },
+      "disabled": false,
+      "autoApprove": [
+        "redis_get",
+        "redis_set",
+        "redis_keys",
+        "redis_hgetall",
+        "redis_hget",
+        "redis_ft_search",
+        "redis_ft_info"
+      ]
+    }
+  }
+}

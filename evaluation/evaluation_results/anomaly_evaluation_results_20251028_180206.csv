@@ -1,0 +1,2 @@
+timestamp,test_name,jsonl_filename,total_samples,normal_count,anomaly_count,anomaly_ratio,kafka_streaming_success,accuracy,precision,recall,f1_score,total_predictions,avg_processing_time_ms,cache_hit_rate,kafka_messages_processed
+2025-10-28 18:02:06,evaluation/anomaly-injection-tests/eval_test_40,evaluation/anomaly-injection-tests/hdfs_eval_test_40.jsonl,1000,600,400,0.4,True,0,0,0,0,0,0,0,0
