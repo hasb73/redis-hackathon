@@ -14,7 +14,7 @@ import time
 import random
 
 class HDFSAnomalyOnlyLoader:
-    def __init__(self, base_path="HDFS_v1"):
+    def __init__(self, base_path="HDFS_dataset"):
         self.base_path = base_path
         self.parsed_path = os.path.join(base_path, "parsed")
         self.preprocessed_path = os.path.join(base_path, "labels")
@@ -241,11 +241,11 @@ if __name__ == "__main__":
     print("STRESS TEST DATA GENERATION")
     print("="*60)
     
-    loader.save_stress_test_data('hdfs_eval_test_5.jsonl', num_samples=10000, anomaly_ratio=0.05)
-    loader.save_stress_test_data('hdfs_eval_test_10.jsonl', num_samples=10000 , anomaly_ratio=0.10)
-    loader.save_stress_test_data('hdfs_eval_test_15.jsonl', num_samples=10000 , anomaly_ratio=0.15)
-    loader.save_stress_test_data('hdfs_eval_test_20.jsonl', num_samples=10000, anomaly_ratio=0.20)
-    loader.save_stress_test_data('hdfs_eval_test_40.jsonl', num_samples=10000, anomaly_ratio=0.40)
+    # loader.save_stress_test_data('hdfs_eval_test_5.jsonl', num_samples=10000, anomaly_ratio=0.05)
+    # loader.save_stress_test_data('hdfs_eval_test_10.jsonl', num_samples=10000 , anomaly_ratio=0.10)
+    # loader.save_stress_test_data('hdfs_eval_test_15.jsonl', num_samples=10000 , anomaly_ratio=0.15)
+    # loader.save_stress_test_data('hdfs_eval_test_20.jsonl', num_samples=10000, anomaly_ratio=0.20)
+    loader.save_stress_test_data('hdfs_eval_test_40.jsonl', num_samples=1000, anomaly_ratio=0.40)
 
     print("\nStress test datasets ready for anomaly detection engine testing!")
     print("Use these files with kafka_producer.py to test the enhanced scoring service")
