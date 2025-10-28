@@ -1,6 +1,4 @@
-# HDFS Anomaly Detection System
-
-## Academic Research Project: Real-Time Log Anomaly Detection Pipeline
+# HDFS Anomaly Detection System using Redis VL as vector DB
 
 ### Abstract
 
